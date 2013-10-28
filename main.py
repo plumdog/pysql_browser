@@ -9,7 +9,7 @@ from sql_highlighter import SQLHighlighter
 from config import config
 
 LIMIT = 100
-
+FKS_IN_MENU_LIMIT = 20
 
 TEST = False
 
@@ -100,7 +100,6 @@ class MainWindow(QtGui.QMainWindow):
             self.last_query_table_columns = self.execute_sql(cols_sql)
             self.last_query_fks = self.execute_sql(fks_sql)
             self.last_query_fks_in = self.execute_sql(fks_in_sql)
-            print(self.last_query_fks_in)
             self.query_widget.execute_sql(sql, set_widget_text=True)
         self.last_query_table = table_name
         self.last_query_db = db
@@ -168,14 +167,12 @@ class QueryWidget(QtGui.QWidget):
         if db.enter_ok:
             result = main_window.execute_sql(sql)
 
-        print('Set Table')
         if result:
             main_window.results_widget.results_widget_table.show_result(
                 result,
                 self.window().last_query_table_columns,
                 self.window().last_query_fks,
                 self.window().last_query_fks_in)
-            print('Set Table Done')
         else:
             print('no result to display')
 
@@ -195,16 +192,13 @@ class QueryTextWidget(QtGui.QTextEdit):
 
 
 class ResultsWidgetTableItem(QtGui.QTableWidgetItem):
-    #DisplayTextRole = QtCore.Qt.UserRole
-    #EditTextRole = QtCore.Qt.UserRole + 1
-    #TextLimit = 100
-    
     def __init__(self, data):
-        #text = str(data)
-        #if len(text) > self.TextLimit:
-        #     text = text[:self.TextLimit] + '...'
-        super().__init__(str(data))
-        # self.edit_text = str(data)
+        
+        if data is None:
+            text = 'NULL'
+        else:
+            text = str(data)
+        super().__init__(text)
 
 
 class ResultsWidgetTableItemDelegate(QtGui.QAbstractItemDelegate):
@@ -244,7 +238,6 @@ class ResultsWidgetTable(QtGui.QTableWidget):
                 self.fks[fk.COLUMN_NAME] = (
                     fk.REFERENCED_TABLE_SCHEMA, fk.REFERENCED_TABLE_NAME, fk.REFERENCED_COLUMN_NAME)
         self.fks_in = []
-        print(fks_in)
         if fks_in:
             for fk in fks_in:
                 self.fks_in.append(
@@ -255,9 +248,6 @@ class ResultsWidgetTable(QtGui.QTableWidget):
         primary_col_num = None
         if columns:
             for col_num, col in enumerate(columns):
-                print(col.keys())
-                print(col)
-                print(col.Key)
                 if col.Key == 'PRI':
                     primary_col_num = col_num
                     self.pk_col_name = col.Field
@@ -265,7 +255,7 @@ class ResultsWidgetTable(QtGui.QTableWidget):
 
         for row_num, row in enumerate(rows):
             for col_num, data in enumerate(row):
-                self.setItem(row_num, col_num, ResultsWidgetTableItem(str(data)))
+                self.setItem(row_num, col_num, ResultsWidgetTableItem(data))
                 if primary_col_num == col_num:
                     self.row_number_to_pk[row_num] = data
 
@@ -278,20 +268,16 @@ class ResultsWidgetTable(QtGui.QTableWidget):
         self.setHorizontalScrollMode(QtGui.QAbstractItemView.ScrollPerPixel)
         self.setVerticalScrollMode(QtGui.QAbstractItemView.ScrollPerPixel)
 
-        # print('done show')
-
     def on_change(self, item):
         if self.items_loaded:
             pos = (item.column(), item.row())
             self.changed_items[pos] = item.text()
 
     def fk_out(self, item, fk, get_sql_only=False):
-        print('fk_out', fk)
         f_db, f_tab, f_col = fk
         return self.window().select_star(f_db, f_tab, [f_col + ' = ' + self.window().escape_for_sql(item.text(), quote=True)], get_sql_only)
 
     def fk_in(self, item, fk, get_sql_only=False):
-        print('fk_in', fk)
         ref_col, db, tab, col = fk
         return self.window().select_star(db, tab, [col + ' = ' + self.window().escape_for_sql(item.text(), quote=True)], get_sql_only)
 
@@ -306,10 +292,24 @@ class ResultsWidgetTable(QtGui.QTableWidget):
             action.triggered.connect(partial(self.fk_out, item, fk))
             menu.addAction(action)
 
+        fk_actions = {}
         for fk in [fk for fk in self.fks_in if fk[0] == field]:
             action = QtGui.QAction(self.fk_in(item, fk, get_sql_only=True), self)
             action.triggered.connect(partial(self.fk_in, item, fk))
-            menu.addAction(action)
+            tab_initial = fk[2][0]
+            fk_actions[tab_initial] = fk_actions.get(tab_initial, []) + [action]
+
+        total_actions = sum(len(actions_list) for actions_list in fk_actions.values())
+
+        submenus = (total_actions > FKS_IN_MENU_LIMIT)
+        for initial, action_list in sorted(fk_actions.items()):
+            if submenus:
+                submenu = menu.addMenu(initial.upper())
+                for action in action_list:
+                    submenu.addAction(action)
+            else:
+                for action in action_list:
+                    menu.addAction(action)
 
         menu.exec_(pos)
 
