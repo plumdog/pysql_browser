@@ -1,6 +1,7 @@
 from PySide import QtCore, QtGui
 
 from sql_highlighter import SQLHighlighter
+from results_widgets import LIMIT
 
 
 class QueryWidget(QtGui.QWidget):
@@ -27,7 +28,7 @@ class QueryWidget(QtGui.QWidget):
         self.window().last_query_table_columns = None
         self.window().last_query_table = None
 
-    def execute_sql_and_show(self, sql, set_widget_text=False, limit=None):
+    def execute_sql_and_show(self, sql, set_widget_text=False, limit=LIMIT):
         result = None
         main_window = self.window()
 
