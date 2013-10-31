@@ -1,3 +1,5 @@
+from functools import partial
+
 from PySide import QtCore, QtGui
 
 from mysql_connection import TunnelledMySQL, QueryError, TransactionError
@@ -11,9 +13,9 @@ TEST = False
 
 
 class MainWindow(QtGui.QMainWindow):
-    def __init__(self, db, parent=None, **kwargs):
+    def __init__(self, parent=None, **kwargs):
         super().__init__(parent)
-        self.db = db
+        self.db = None
         self.query_widget = QueryWidget(self)
         self.results_widget = ResultsWidget(self)
         self.tables_widget = TablesWidget(self)
@@ -25,11 +27,7 @@ class MainWindow(QtGui.QMainWindow):
 
         self.default_database = None
 
-        dbs = self.get_databases()
-        self.tables_widget.dbs(dbs)
-        for d in dbs:
-            if ' ' not in d:
-                self.set_tables(d)
+        self.create_menus()
 
         self.main_splitter = QtGui.QSplitter()
         query_and_results_splitter = QtGui.QSplitter(self)
@@ -49,16 +47,39 @@ class MainWindow(QtGui.QMainWindow):
         self.main_splitter.setHandleWidth(3)
         self.setCentralWidget(self.main_splitter)
 
+    def create_menus(self):
+        servers_menu = self.menuBar().addMenu('&Servers')
+        for server_key, (name, connection) in sorted(dict(config).items()):
+            action = QtGui.QAction(name, self)
+            action.triggered.connect(partial(self.set_db_server, server_key))
+            servers_menu.addAction(action)
+        
+
+    def set_db_server(self, db_key):
+        if self.db and self.db.enter_ok:
+            self.db.close()
+
+        connection_config = config[db_key][1]
+
+        self.db = TunnelledMySQL(**connection_config)
+        self.db.__enter__()
+        self.load_dbs_and_tables()
+
+    def load_dbs_and_tables(self):
+        self.tables_widget.clear()
+
+        dbs = self.get_databases()
+        self.tables_widget.dbs(dbs)
+        for d in dbs:
+            if ' ' not in d:
+                self.set_tables(d)
+
     def get_databases(self):
-        if TEST:
-            return ['db1', 'db2']
         cmd = 'SHOW DATABASES;'
         keys, results = self.execute_sql(cmd)
         return [d[0] for d in results]
 
     def get_tables(self, db):
-        if TEST:
-            return ['t1', 't2']
         cmd = 'SHOW TABLES FROM ' + db + ';'
         keys, results = self.execute_sql(cmd)
         return [t[0] for t in results]
@@ -92,16 +113,10 @@ class MainWindow(QtGui.QMainWindow):
             tab=escape(table_name, quote=True),
             db=escape(db, quote=True))
         
-        if TEST:
-            print(sql)
-            print(cols_sql)
-            print(fks_sql)
-            print(fks_in_sql)
-        else:
-            _, self.last_query_table_columns = self.execute_sql(cols_sql)
-            _, self.last_query_fks = self.execute_sql(fks_sql)
-            _, self.last_query_fks_in = self.execute_sql(fks_in_sql)
-            self.query_widget.execute_sql_and_show(sql, set_widget_text=True)
+        _, self.last_query_table_columns = self.execute_sql(cols_sql)
+        _, self.last_query_fks = self.execute_sql(fks_sql)
+        _, self.last_query_fks_in = self.execute_sql(fks_in_sql)
+        self.query_widget.execute_sql_and_show(sql, set_widget_text=True)
         self.last_query_table = table_name
         self.last_query_db = db
 
@@ -133,17 +148,13 @@ class MainWindow(QtGui.QMainWindow):
                 return (results.keys(), result_rows)
 
 
-def main(db=None):
+def main():
     import sys
     app = QtGui.QApplication(sys.argv)
-    window = MainWindow(db=db)
+    window = MainWindow()
     window.show()
     sys.exit(app.exec_())
 
 
 if __name__ == '__main__':
-    if TEST:
-        main()
-    else:
-        with TunnelledMySQL(**config) as db:
-            main(db)
+    main()

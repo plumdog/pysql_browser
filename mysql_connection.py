@@ -68,6 +68,9 @@ class TunnelledMySQL(object):
         return self
 
     def __exit__(self, _type, value, traceback):
+        self.close()
+
+    def close(self):
         if self.connection:
             self.connection.close()
         if self.tun:
