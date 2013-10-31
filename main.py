@@ -1,6 +1,6 @@
 from PySide import QtCore, QtGui
 
-from mysql_connection import TunnelledMySQL, QueryError
+from mysql_connection import TunnelledMySQL, QueryError, TransactionError
 from results_widgets import ResultsWidget
 from query_widgets import QueryWidget
 from tables_widgets import TablesWidget
@@ -53,14 +53,14 @@ class MainWindow(QtGui.QMainWindow):
         if TEST:
             return ['db1', 'db2']
         cmd = 'SHOW DATABASES;'
-        keys, results = list(self.execute_sql(cmd))
+        keys, results = self.execute_sql(cmd)
         return [d[0] for d in results]
 
     def get_tables(self, db):
         if TEST:
             return ['t1', 't2']
         cmd = 'SHOW TABLES FROM ' + db + ';'
-        keys, results = list(self.execute_sql(cmd))
+        keys, results = self.execute_sql(cmd)
         return [t[0] for t in results]
 
     def set_tables(self, db):
@@ -119,10 +119,18 @@ class MainWindow(QtGui.QMainWindow):
         else:
             if notify:
                 print('Success')
-            if limit is None:
-                return (results.keys(), results.fetchall())
+
+            try:
+                if limit is None:
+                    result_rows = results.fetchall()
+                else:
+                    result_rows = results.fetchmany(limit)
+            except TransactionError as e:
+                if notify:
+                    print('No rows to get')
+                return None
             else:
-                return (results.keys(), results.fetchmany(limit))
+                return (results.keys(), result_rows)
 
 
 def main(db=None):

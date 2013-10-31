@@ -2,7 +2,7 @@ import sys
 
 import sqlalchemy
 import plumbum
-from sqlalchemy.exc import SQLAlchemyError as QueryError
+from sqlalchemy.exc import SQLAlchemyError as QueryError, ResourceClosedError as TransactionError
 
 
 # We start an ssh tunnel that links a remote port with a local one. We
