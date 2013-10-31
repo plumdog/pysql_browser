@@ -39,14 +39,10 @@ class ResultsWidgetTable(QtGui.QTableWidget):
         self.fks_in = []
 
     def disable_editting(self):
-        print('disable')
         self.setEditTriggers(self.NoEditTriggers)
-        print(int(self.editTriggers()))
 
     def enable_editting(self):
-        print('enable')
         self.setEditTriggers(self.AnyKeyPressed | self.EditKeyPressed | self.DoubleClicked)
-        print(int(self.editTriggers()))
     
     def show_result(self, result, keys, columns=None, fks=None, fks_in=None):
         self.setColumnCount(len(keys))
@@ -62,14 +58,11 @@ class ResultsWidgetTable(QtGui.QTableWidget):
 
         self.fks = {}
         if fks:
-            print(fks)
             for fk in fks:
                 self.fks[fk.COLUMN_NAME] = (
                     fk.REFERENCED_TABLE_SCHEMA, fk.REFERENCED_TABLE_NAME, fk.REFERENCED_COLUMN_NAME)
         self.fks_in = []
         if fks_in:
-            print(fks_in)
-            print(list(fks_in))
             for fk in fks_in:
                 self.fks_in.append(
                     (fk.REFERENCED_COLUMN_NAME, fk.TABLE_SCHEMA,
