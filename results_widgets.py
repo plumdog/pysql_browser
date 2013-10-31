@@ -89,7 +89,10 @@ class ResultsWidgetTable(QtGui.QTableWidget):
         
         for row_num, row in enumerate(rows):
             for col_num, data in enumerate(row):
-                datatype = field_type_to_datatype(columns[col_num].Type)
+                if columns is not None:
+                    datatype = field_type_to_datatype(columns[col_num].Type)
+                else:
+                    datatype = ResultString
                 self.setItem(row_num, col_num, ResultsWidgetTableItem(data, datatype))
                 if primary_col_num == col_num:
                     self.row_number_to_pk[row_num] = data

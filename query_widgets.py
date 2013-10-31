@@ -40,13 +40,26 @@ class QueryWidget(QtGui.QWidget):
         if main_window.db.enter_ok:
             keys, result = main_window.execute_sql(sql, limit=limit)
 
+        last_query_table_columns = self.window().last_query_table_columns
+        last_query_fks = self.window().last_query_fks
+        last_query_fks_in = self.window().last_query_fks_in
+
+        if last_query_table_columns is not None:
+            last_query_table_columns = list(last_query_table_columns)
+
+        if last_query_fks is not None:
+            last_query_fks = list(last_query_fks)
+
+        if last_query_fks_in is not None:
+            last_query_fks_in = list(last_query_fks_in)
+
         if result:
             main_window.results_widget.results_widget_table.show_result(
                 result,
                 keys,
-                list(self.window().last_query_table_columns),
-                list(self.window().last_query_fks),
-                list(self.window().last_query_fks_in))
+                last_query_table_columns,
+                last_query_fks,
+                last_query_fks_in)
         else:
             print('no result to display')
 
