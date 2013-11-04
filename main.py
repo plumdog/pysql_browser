@@ -3,9 +3,8 @@ from functools import partial
 from PySide import QtCore, QtGui
 
 from mysql_connection import TunnelledMySQL, QueryError, TransactionError
-from results_widgets import ResultsWidget
-from query_widgets import QueryWidget
 from tables_widgets import TablesWidget
+from tab_widgets import Tabs, Tab
 from db_config import config
 import app_config
 from mysql_utils import escape
@@ -18,75 +17,68 @@ class MainWindow(QtGui.QMainWindow):
     def __init__(self, parent=None, **kwargs):
         super().__init__(parent)
         self.setWindowTitle(app_config.window_title)
+        self.setWindowIcon(QtGui.QIcon('python.png'))
 
         self.db = None
-        self.query_widget = QueryWidget(self)
-        self.results_widget = ResultsWidget(self)
         self.tables_widget = TablesWidget(self)
+
         self.last_query_table = None
         self.last_query_db = None
         self.last_query_table_columns = None
         self.last_query_fks = None
         self.last_query_fks_in = None
+        self.tab_count = 0
 
         self.default_database = None
-
         self.progress_bar = None
-
         self.create_menus()
 
         self.main_splitter = QtGui.QSplitter()
-        query_and_results_splitter = QtGui.QSplitter(self)
-        query_and_results_splitter.setOrientation(QtCore.Qt.Vertical) 
-        query_and_results_splitter.addWidget(self.query_widget)
-        query_and_results_splitter.addWidget(self.results_widget)
-        query_and_results_splitter.setStretchFactor(0, app_config.v_split_1)
-        query_and_results_splitter.setStretchFactor(1, app_config.v_split_2)
-        query_and_results_splitter.setChildrenCollapsible(False)
-        query_and_results_splitter.setHandleWidth(app_config.v_split_handle)
+        self.tabs_widget = Tabs(self)
+        self.tabs_widget.setTabsClosable(True)
         
         self.main_splitter.addWidget(self.tables_widget)
-        self.main_splitter.addWidget(query_and_results_splitter)
-        self.main_splitter.setStretchFactor(0, app_config.h_split_1)
-        self.main_splitter.setStretchFactor(1, app_config.h_split_2)
+        self.main_splitter.addWidget(self.tabs_widget)
+        self.main_splitter.setSizes((1, 1))
         self.main_splitter.setChildrenCollapsible(False)
         self.main_splitter.setHandleWidth(app_config.h_split_handle)
         self.setCentralWidget(self.main_splitter)
 
         self.statusBar().showMessage("Startup Completed")
 
+    def new_tab(self):
+        ind = self.tabs_widget.currentIndex() + 1
+        self.tab_count += 1
+        set_ind = self.tabs_widget.insertTab(ind, Tab(self), 'SQL ' + str(self.tab_count))
+        self.tabs_widget.setCurrentIndex(set_ind)
+
     def create_menus(self):
+        file_menu = self.menuBar().addMenu('&File')
+        action = QtGui.QAction('New &Tab', self)
+        action.triggered.connect(self.new_tab)
+        file_menu.addAction(action)
+
         servers_menu = self.menuBar().addMenu('&Servers')
         for server_key, (name, connection) in sorted(dict(config).items()):
             action = QtGui.QAction(name, self)
             action.triggered.connect(partial(self.set_db_server, server_key))
             servers_menu.addAction(action)
-        
 
     def set_db_server(self, db_key):
         if self.db and self.db.enter_ok:
             self.db.close()
 
+        self.tabs_widget.clear()
+        self.repaint()
+
         name, connection_config = config[db_key]
         self.statusBar().showMessage('Loading ' + name)
-
-        if self.progress_bar is None:
-            self.progress_bar = QtGui.QProgressBar(self)
-            self.progress_bar.setValue(0)
-            self.statusBar().addPermanentWidget(self.progress_bar)
-            self.repaint()
-        else:
-            self.progress_bar.setValue(0)
-            self.repaint()
-
         self.db = TunnelledMySQL(**connection_config)
         self.db.__enter__()
-        self.progress_bar.setValue(app_config.progress_jump)
-        self.progress_bar.repaint()
-        self.load_dbs_and_tables()
+        self.load_dbs()
         self.statusBar().showMessage('Loaded ' + name)
         
-    def load_dbs_and_tables(self):
+    def load_dbs(self):
         self.tables_widget.clear()
 
         dbs = self.get_databases()
@@ -98,11 +90,6 @@ class MainWindow(QtGui.QMainWindow):
         pc = app_config.progress_jump
         full = 100
         each = (full - pc) / num_dbs
-
-        for i, d in enumerate(_dbs):
-            self.set_tables(d)
-            set_to = pc + (i + 1) * each
-            self.progress_bar.setValue(set_to)
 
     def get_databases(self):
         cmd = SQLLoader.show_databases
@@ -146,9 +133,23 @@ class MainWindow(QtGui.QMainWindow):
         _, self.last_query_table_columns = self.execute_sql(cols_sql)
         _, self.last_query_fks = self.execute_sql(fks_sql)
         _, self.last_query_fks_in = self.execute_sql(fks_in_sql)
-        self.query_widget.execute_sql_and_show(sql, set_widget_text=True)
+        self.current_tab_widget().query_widget.execute_sql_and_show(sql, set_widget_text=True)
         self.last_query_table = table_name
         self.last_query_db = db
+
+    def current_tab_widget(self):
+        if self.tabs_widget.count() == 0:
+            return self.new_tab_widget()
+        else:
+            return self.new_tab_widget()
+
+    def new_tab_widget(self):
+        curr = self.tabs_widget.currentWidget()
+        if curr and curr.is_empty():
+            return curr
+        else:
+            self.new_tab()
+            return self.current_tab_widget()
 
     def execute_sql(self, sql, notify=True, sql_params=[], limit=None):
         try:

@@ -54,17 +54,21 @@ class QueryWidget(QtGui.QWidget):
             last_query_fks_in = list(last_query_fks_in)
 
         if result:
-            main_window.results_widget.results_widget_table.show_result(
+            self.results_widget().results_widget_table.show_result(
                 result,
                 keys,
                 last_query_table_columns,
                 last_query_fks,
                 last_query_fks_in)
         else:
+            self.results_widget().results_widget_table.clear()
             print('no result to display')
 
     def sql(self):
         return self.query_text_widget.toPlainText()
+
+    def results_widget(self):
+        return self.parent().parent().results_widget
 
 
 class QueryTextWidget(QtGui.QTextEdit):
