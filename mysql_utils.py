@@ -6,3 +6,4 @@ def escape(string, quote=False):
         return '"' + string + '"'
     else:
         return string
+    

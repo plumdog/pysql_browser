@@ -35,4 +35,4 @@ nosetests.xml
 .project
 .pydevproject
 
-config.py
+db_config.py

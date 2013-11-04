@@ -6,8 +6,10 @@ from mysql_connection import TunnelledMySQL, QueryError, TransactionError
 from results_widgets import ResultsWidget
 from query_widgets import QueryWidget
 from tables_widgets import TablesWidget
-from config import config
+from db_config import config
+import app_config
 from mysql_utils import escape
+from sql_loader import SQLLoader
 
 TEST = False
 
@@ -15,6 +17,8 @@ TEST = False
 class MainWindow(QtGui.QMainWindow):
     def __init__(self, parent=None, **kwargs):
         super().__init__(parent)
+        self.setWindowTitle(app_config.window_title)
+
         self.db = None
         self.query_widget = QueryWidget(self)
         self.results_widget = ResultsWidget(self)
@@ -27,6 +31,8 @@ class MainWindow(QtGui.QMainWindow):
 
         self.default_database = None
 
+        self.progress_bar = None
+
         self.create_menus()
 
         self.main_splitter = QtGui.QSplitter()
@@ -34,18 +40,20 @@ class MainWindow(QtGui.QMainWindow):
         query_and_results_splitter.setOrientation(QtCore.Qt.Vertical) 
         query_and_results_splitter.addWidget(self.query_widget)
         query_and_results_splitter.addWidget(self.results_widget)
-        query_and_results_splitter.setStretchFactor(0, 2)
-        query_and_results_splitter.setStretchFactor(1, 3)
+        query_and_results_splitter.setStretchFactor(0, app_config.v_split_1)
+        query_and_results_splitter.setStretchFactor(1, app_config.v_split_2)
         query_and_results_splitter.setChildrenCollapsible(False)
-        query_and_results_splitter.setHandleWidth(3)
+        query_and_results_splitter.setHandleWidth(app_config.v_split_handle)
         
         self.main_splitter.addWidget(self.tables_widget)
         self.main_splitter.addWidget(query_and_results_splitter)
-        self.main_splitter.setStretchFactor(0, 1)
-        self.main_splitter.setStretchFactor(1, 3)
+        self.main_splitter.setStretchFactor(0, app_config.h_split_1)
+        self.main_splitter.setStretchFactor(1, app_config.h_split_2)
         self.main_splitter.setChildrenCollapsible(False)
-        self.main_splitter.setHandleWidth(3)
+        self.main_splitter.setHandleWidth(app_config.h_split_handle)
         self.setCentralWidget(self.main_splitter)
+
+        self.statusBar().showMessage("Startup Completed")
 
     def create_menus(self):
         servers_menu = self.menuBar().addMenu('&Servers')
@@ -59,28 +67,50 @@ class MainWindow(QtGui.QMainWindow):
         if self.db and self.db.enter_ok:
             self.db.close()
 
-        connection_config = config[db_key][1]
+        name, connection_config = config[db_key]
+        self.statusBar().showMessage('Loading ' + name)
+
+        if self.progress_bar is None:
+            self.progress_bar = QtGui.QProgressBar(self)
+            self.progress_bar.setValue(0)
+            self.statusBar().addPermanentWidget(self.progress_bar)
+            self.repaint()
+        else:
+            self.progress_bar.setValue(0)
+            self.repaint()
 
         self.db = TunnelledMySQL(**connection_config)
         self.db.__enter__()
+        self.progress_bar.setValue(app_config.progress_jump)
+        self.progress_bar.repaint()
         self.load_dbs_and_tables()
-
+        self.statusBar().showMessage('Loaded ' + name)
+        
     def load_dbs_and_tables(self):
         self.tables_widget.clear()
 
         dbs = self.get_databases()
         self.tables_widget.dbs(dbs)
-        for d in dbs:
-            if ' ' not in d:
-                self.set_tables(d)
+
+        _dbs = [d for d in dbs if ' ' not in d]
+
+        num_dbs = len(_dbs)
+        pc = app_config.progress_jump
+        full = 100
+        each = (full - pc) / num_dbs
+
+        for i, d in enumerate(_dbs):
+            self.set_tables(d)
+            set_to = pc + (i + 1) * each
+            self.progress_bar.setValue(set_to)
 
     def get_databases(self):
-        cmd = 'SHOW DATABASES;'
+        cmd = SQLLoader.show_databases
         keys, results = self.execute_sql(cmd)
         return [d[0] for d in results]
 
     def get_tables(self, db):
-        cmd = 'SHOW TABLES FROM ' + db + ';'
+        cmd = SQLLoader.show_tables.format(db=db)
         keys, results = self.execute_sql(cmd)
         return [t[0] for t in results]
 
@@ -92,7 +122,7 @@ class MainWindow(QtGui.QMainWindow):
             db_prefix = ''
         else:
             db_prefix = db + '.'
-        sql = 'SELECT * FROM {db_prefix}{table_name}'.format(
+        sql = SQLLoader.select_star.format(
             db_prefix=db_prefix, table_name=table_name)
         
         if wheres:
@@ -104,12 +134,12 @@ class MainWindow(QtGui.QMainWindow):
         if get_sql_only:
             return sql
             
-        cols_sql = 'SHOW COLUMNS FROM {db_prefix}{table_name};'.format(
+        cols_sql = SQLLoader.show_columns.format(
             db_prefix=db_prefix, table_name=table_name)
-        fks_sql = 'SELECT * FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_NAME = {tab} AND TABLE_SCHEMA = {db} AND REFERENCED_TABLE_NAME IS NOT NULL'.format(
+        fks_sql = SQLLoader.fks.format(
             tab=escape(table_name, quote=True),
             db=escape(db, quote=True))
-        fks_in_sql = 'SELECT * FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_NAME IS NOT NULL AND TABLE_SCHEMA = {db} AND REFERENCED_TABLE_NAME = {tab}'.format(
+        fks_in_sql = SQLLoader.fks_in.format(
             tab=escape(table_name, quote=True),
             db=escape(db, quote=True))
         
@@ -123,7 +153,7 @@ class MainWindow(QtGui.QMainWindow):
     def execute_sql(self, sql, notify=True, sql_params=[], limit=None):
         try:
             if self.default_database:
-                self.db.connection.execute('USE ' + self.default_database)
+                self.db.connection.execute(SQLLoader.use.format(db=self.default_database))
             results = self.db.connection.execute(sql, *sql_params)
                 
         except QueryError as e:
