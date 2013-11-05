@@ -6,9 +6,8 @@ from PySide import QtCore, QtGui
 from result_datatypes import ResultString, ResultInteger, field_type_to_datatype
 from mysql_utils import escape
 
-LIMIT = 100
 FKS_IN_MENU_LIMIT = 20
-
+LIMITS = [20, 50, 100, 200, 500]
 
 class ResultsWidgetTableItem(QtGui.QTableWidgetItem):
     def __init__(self, data, datatype):
@@ -46,7 +45,7 @@ class ResultsWidgetTable(QtGui.QTableWidget):
     
     def show_result(self, result, keys, columns=None, fks=None, fks_in=None):
         self.setColumnCount(len(keys))
-        self.setRowCount(min(len(result), LIMIT))
+        self.setRowCount(min(len(result), self.parent().fetch_limit))
 
         for col, key_name in enumerate(keys):
             key_header = QtGui.QTableWidgetItem(key_name)
@@ -160,11 +159,19 @@ class ResultsWidget(QtGui.QWidget):
         super().__init__(parent)
         self.results_widget_table = ResultsWidgetTable(self)
         self.commit_button = QtGui.QPushButton("Commit", self)
+        self.fetch_limit_options = QtGui.QComboBox(self)
+        self.fetch_limit_options.addItems([str(lim) for lim in LIMITS])
+
+        start_index = 2
+        self.fetch_limit = LIMITS[2]
+        self.fetch_limit_options.setCurrentIndex(start_index)
 
         self.commit_button.clicked.connect(self.commit_changes)
+        self.fetch_limit_options.currentIndexChanged.connect(self.set_limit)
 
         button_layout = QtGui.QHBoxLayout()
         button_layout.addStretch(1)
+        button_layout.addWidget(self.fetch_limit_options)
         button_layout.addWidget(self.commit_button)
 
         layout = QtGui.QVBoxLayout()
@@ -187,3 +194,8 @@ class ResultsWidget(QtGui.QWidget):
                 pk=pk)
             self.window().execute_sql(sql, new_text)
         self.results_widget_table.changed_items = {}
+
+    def set_limit(self, index):
+        print('set limit')
+        self.fetch_limit = LIMITS[index]
+            
