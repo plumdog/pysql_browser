@@ -182,7 +182,7 @@ class MainWindow(QtGui.QMainWindow):
             except TransactionError as e:
                 if notify:
                     print('No rows to get')
-                return None
+                return [], []
             else:
                 return (results.keys(), result_rows)
 
