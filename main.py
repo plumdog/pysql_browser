@@ -112,11 +112,25 @@ class MainWindow(QtGui.QMainWindow):
     def set_tables(self, db):
         self.tables_widget.tables(db, self.get_tables(db))
 
-    def select_star(self, db, table_name, wheres=[], get_sql_only=False):
+    def _db_prefix(self, db):
         if self.default_database == db:
-            db_prefix = ''
+            return ''
         else:
-            db_prefix = db + '.'
+            return db + '.'
+
+    def get_table_info(self, db, table_name):
+        db_prefix = self._db_prefix(db)
+        cols_cmd = SQLLoader.show_columns.format(db_prefix=db_prefix, table_name=table_name)
+        col_keys, cols = self.execute_sql(cols_cmd)
+
+        info_cmd = SQLLoader.table_status.format(db=db, table_name=table_name)
+        keys, info = self.execute_sql(info_cmd)
+        info_list = zip(list(keys), list(info[0]))
+
+        return (col_keys, list(cols)), info_list
+
+    def select_star(self, db, table_name, wheres=[], get_sql_only=False):
+        db_prefix = self._db_prefix(db)
         sql = SQLLoader.select_star.format(
             db_prefix=db_prefix, table_name=table_name)
         
@@ -144,6 +158,7 @@ class MainWindow(QtGui.QMainWindow):
         self.current_tab_widget().query_widget.execute_sql_and_show(sql, set_widget_text=True)
         self.last_query_table = table_name
         self.last_query_db = db
+
 
     def current_tab_widget(self):
         if self.tabs_widget.count() == 0:
