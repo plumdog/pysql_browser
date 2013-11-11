@@ -65,18 +65,26 @@ class MainWindow(QtGui.QMainWindow):
             servers_menu.addAction(action)
 
     def set_db_server(self, db_key):
+        self._set_db_server_first(db_key)
+
+        name, connection_config = config[db_key]
+        self.statusBar().showMessage('Loading ' + name)
+        self.repaint()
+        self.thread = ConnectThread(self, name, **connection_config)
+        self.thread.finished.connect(self._set_db_server_second)
+        self.thread.start()
+
+    def _set_db_server_first(self, db_key):
         if self.db and self.db.enter_ok:
             self.db.close()
 
         self.tabs_widget.clear()
         self.repaint()
 
-        name, connection_config = config[db_key]
-        self.statusBar().showMessage('Loading ' + name)
-        self.db = TunnelledMySQL(**connection_config)
-        self.db.__enter__()
+    def _set_db_server_second(self):
+        self.db = self.thread.db
         self.load_dbs()
-        self.statusBar().showMessage('Loaded ' + name)
+        self.statusBar().showMessage('Loaded')
         
     def load_dbs(self):
         self.tables_widget.clear()
@@ -178,6 +186,18 @@ class MainWindow(QtGui.QMainWindow):
             else:
                 return (results.keys(), result_rows)
 
+class ConnectThread(QtCore.QThread):
+    def __init__(self, parent=None, name='', **connection_config):
+        super().__init__(parent)
+        self.db = None
+        self.connection_config = connection_config
+
+    def run(self):
+        print('start')
+        self.db = TunnelledMySQL(**self.connection_config)
+        self.db.__enter__()
+        print('done')
+        
 
 def main():
     import sys
