@@ -1,8 +1,8 @@
 from PySide import QtCore, QtGui
 
-from query_widgets import QueryWidget
-from results_widgets import ResultsWidget
-import app_config
+from .query_widgets import QueryWidget
+from .results_widgets import ResultsWidget
+from . import app_config
 
 class Tabs(QtGui.QTabWidget):
     def __init__(self, parent=None):

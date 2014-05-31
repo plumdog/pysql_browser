@@ -3,8 +3,8 @@ from pprint import pprint
 
 from PySide import QtCore, QtGui
 
-from result_datatypes import ResultString, ResultInteger, field_type_to_datatype
-from mysql_utils import escape
+from .result_datatypes import ResultString, ResultInteger, field_type_to_datatype
+from .mysql_utils import escape
 
 FKS_IN_MENU_LIMIT = 20
 LIMITS = [20, 50, 100, 200, 500]

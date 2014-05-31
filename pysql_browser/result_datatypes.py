@@ -1,4 +1,4 @@
-from mysql_utils import escape
+from .mysql_utils import escape
 
 
 def field_type_to_datatype(field_type):

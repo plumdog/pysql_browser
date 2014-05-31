@@ -1,6 +1,6 @@
 from PySide import QtGui, QtCore
 
-from mysql_keywords import KEYWORDS
+from .mysql_keywords import KEYWORDS
 
 class SQLHighlighter(QtGui.QSyntaxHighlighter):
     def __init__(self, parent=None):

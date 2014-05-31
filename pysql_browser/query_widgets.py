@@ -1,6 +1,6 @@
 from PySide import QtCore, QtGui
 
-from sql_highlighter import SQLHighlighter
+from .sql_highlighter import SQLHighlighter
 
 
 class QueryWidget(QtGui.QWidget):
