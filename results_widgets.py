@@ -153,6 +153,11 @@ class ResultsWidgetTable(QtGui.QTableWidget):
 
         menu.exec_(pos)
 
+    def clear_full(self):
+        self.clear()
+        self.setColumnCount(0)
+        self.setRowCount(0)
+
 
 class ResultsWidget(QtGui.QWidget):
     def __init__(self, parent=None):

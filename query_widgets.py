@@ -54,16 +54,18 @@ class QueryWidget(QtGui.QWidget):
         if last_query_fks_in is not None:
             last_query_fks_in = list(last_query_fks_in)
 
-        if result:
+        if result is None:
+            print('no rows returned')
+        elif not result:
+            self.results_widget().results_widget_table.clear_full()
+            print('no rows matched')
+        else:
             self.results_widget().results_widget_table.show_result(
                 result,
                 keys,
                 last_query_table_columns,
                 last_query_fks,
                 last_query_fks_in)
-        else:
-            self.results_widget().results_widget_table.clear()
-            print('no result to display')
 
     def sql(self):
         return self.query_text_widget.toPlainText()
