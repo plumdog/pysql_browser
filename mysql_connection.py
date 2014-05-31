@@ -1,8 +1,8 @@
 import sys
 
-import sqlalchemy
 import plumbum
-from sqlalchemy.exc import SQLAlchemyError as QueryError, ResourceClosedError as TransactionError
+from pymysql import connect as mysql_connect
+from pymysql.err import ProgrammingError as QueryError
 
 
 # We start an ssh tunnel that links a remote port with a local one. We
@@ -31,9 +31,7 @@ def _mysql_connect(mysql_username, mysql_password, local_port):
 def mysql_connection(mysql_username, mysql_password, local_port):
     """This performs the connection and returns a connection object
     that we can use to execute our SQL commands."""
-    con_str = _mysql_connect(mysql_username, mysql_password, local_port)
-    eng = sqlalchemy.create_engine(con_str)
-    return eng.connect()
+    return mysql_connect(user=mysql_username, passwd=mysql_password, port=local_port)
 
 
 class TunnelledMySQL(object):

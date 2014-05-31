@@ -1,14 +1,16 @@
 from functools import partial
+from collections import namedtuple
 
 from PySide import QtCore, QtGui
 
-from mysql_connection import TunnelledMySQL, QueryError, TransactionError
+from mysql_connection import TunnelledMySQL, QueryError
 from tables_widgets import TablesWidget
 from tab_widgets import Tabs, Tab
 from db_config import config
 import app_config
 from mysql_utils import escape
 from sql_loader import SQLLoader
+
 
 TEST = False
 
@@ -177,8 +179,9 @@ class MainWindow(QtGui.QMainWindow):
     def execute_sql(self, sql, notify=True, sql_params=[], limit=None):
         try:
             if self.default_database:
-                self.db.connection.execute(SQLLoader.use.format(db=self.default_database))
-            results = self.db.connection.execute(sql, *sql_params)
+                self.db.connection.cursor().execute(SQLLoader.use.format(db=self.default_database))
+            cursor = self.db.connection.cursor()
+            cursor.execute(sql, *sql_params)
                 
         except QueryError as e:
             if notify:
@@ -189,17 +192,27 @@ class MainWindow(QtGui.QMainWindow):
             if notify:
                 print('Success')
 
-            try:
-                if limit is None:
-                    result_rows = results.fetchall()
-                else:
-                    result_rows = results.fetchmany(limit)
-            except TransactionError as e:
+            if limit is None:
+                result_rows = cursor.fetchall()
+            else:
+                result_rows = cursor.fetchmany(limit)
+
+            if result_rows is None:
+                return None, None
+            
+            if not cursor.description:
+                # then there are no columns in the return set. Return empties
                 if notify:
-                    print('No rows to get')
+                    print('No columns in returned set')
                 return [], []
             else:
-                return (results.keys(), result_rows)
+                ColKey = namedtuple(
+                    'ColKey',
+                    'name type_code display_size internal_size precision scale null_ok')
+                cols = [ColKey(*d) for d in cursor.description]
+                Row = namedtuple('Row', [col.name for col in cols])
+                rows = [Row(*r) for r in result_rows]
+                return (cols, rows)
 
 class ConnectThread(QtCore.QThread):
     def __init__(self, parent=None, name='', **connection_config):

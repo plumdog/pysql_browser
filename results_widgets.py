@@ -48,7 +48,7 @@ class ResultsWidgetTable(QtGui.QTableWidget):
         self.setRowCount(min(len(result), self.parent().fetch_limit))
 
         for col, key_name in enumerate(keys):
-            key_header = QtGui.QTableWidgetItem(key_name)
+            key_header = QtGui.QTableWidgetItem(key_name.name)
             key_header.setTextAlignment(QtCore.Qt.AlignLeft)
             self.setHorizontalHeaderItem(col, key_header)
             self.col_number_to_field[col] = key_name
@@ -183,7 +183,7 @@ class ResultsWidget(QtGui.QWidget):
     def commit_changes(self):
         for (col_num, row_num), new_text in self.results_widget_table.changed_items.items():
             pk = self.results_widget_table.row_number_to_pk.get(row_num)
-            field = self.results_widget_table.col_number_to_field.get(col_num)
+            field = self.results_widget_table.col_number_to_field.get(col_num).name
 
             sql = 'UPDATE {db}.{table} SET {field} = {new_text} WHERE {pk_field} = {pk}'.format(
                 db=self.window().last_query_db,
@@ -192,7 +192,7 @@ class ResultsWidget(QtGui.QWidget):
                 pk_field=self.results_widget_table.pk_col_name,
                 new_text=escape(new_text, quote=True),
                 pk=pk)
-            self.window().execute_sql(sql, new_text)
+            self.window().execute_sql(sql)
         self.results_widget_table.changed_items = {}
 
     def set_limit(self, index):
