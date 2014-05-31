@@ -1,0 +1,2 @@
+PyMySQL==0.6.2
+plumbum==1.4.2
