@@ -3,7 +3,7 @@ from collections import OrderedDict
 from PySide import QtGui, QtCore
 
 from ..connections import Connection
-from ..settings_saver import save, load
+from ..connections_saver import save, load
 
 
 class ConnectionsDialog(QtGui.QDialog):
@@ -39,18 +39,18 @@ class ConnectionsList(QtGui.QListWidget):
             self.connections.append(connection)
         else:
             self.connections[row_num] = connection
-        save('connections', self.connections)
+        save(self.connections)
         self.load_items()
 
         return self.connections.index(connection)
 
     def del_connection(self, row_num):
         del self.connections[row_num]
-        save('connections', self.connections)
+        save(self.connections)
         self.load_items()
 
     def load_items(self):
-        self.connections = load('connections', [])
+        self.connections = load()
         self.clear()
         self.addItems([c.name for c in self.connections])
 

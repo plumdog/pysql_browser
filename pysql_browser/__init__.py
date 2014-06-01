@@ -11,7 +11,7 @@ from .mysql_utils import escape
 from .sql_loader import SQLLoader
 from .dialogs.connections_dialog import ConnectionsDialog
 from .connections import Connection
-from .settings_saver import load
+from .connections_saver import load
 
 
 TEST = False
@@ -68,7 +68,7 @@ class MainWindow(QtGui.QMainWindow):
 
     def populate_connections_menu(self):
         self.connections_menu.clear()
-        self.connections = load('connections', [])
+        self.connections = load()
         if self.connections:
             for connection in self.connections:
                 action = QtGui.QAction(connection.name, self)
