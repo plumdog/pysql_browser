@@ -2,7 +2,7 @@ import sys
 
 import plumbum
 from pymysql import connect as mysql_connect
-from pymysql.err import ProgrammingError as QueryError
+from pymysql.err import ProgrammingError as QueryError, OperationalError
 
 
 # We start an ssh tunnel that links a remote port with a local one. We

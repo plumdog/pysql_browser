@@ -3,7 +3,7 @@ from collections import namedtuple
 
 from PySide import QtCore, QtGui
 
-from .mysql_connection import TunnelledMySQL, QueryError
+from .mysql_connection import TunnelledMySQL, QueryError, OperationalError
 from .tables_widgets import TablesWidget
 from .tab_widgets import Tabs, Tab
 from . import app_config
@@ -107,9 +107,17 @@ class MainWindow(QtGui.QMainWindow):
         self.repaint()
 
     def _set_db_server_second(self):
-        self.db = self.thread.db
-        self.load_dbs()
-        self.statusBar().showMessage('Loaded')
+        if self.thread.error:
+            if isinstance(self.thread.error, EOFError):
+                message = 'SSH Tunnel connection failed.'
+            elif isinstance(self.thread.error, OperationalError):
+                code, message = self.thread.error.args
+
+            self.statusBar().showMessage('Error: ' + message)
+        else:
+            self.db = self.thread.db
+            self.load_dbs()
+            self.statusBar().showMessage('Loaded')
         
     def load_dbs(self):
         self.tables_widget.clear()
@@ -118,11 +126,11 @@ class MainWindow(QtGui.QMainWindow):
         self.tables_widget.dbs(dbs)
 
         _dbs = [d for d in dbs if ' ' not in d]
-
-        num_dbs = len(_dbs)
-        pc = app_config.progress_jump
-        full = 100
-        each = (full - pc) / num_dbs
+        if _dbs and False:
+            num_dbs = len(_dbs)
+            pc = app_config.progress_jump
+            full = 100
+            each = (full - pc) / num_dbs
 
     def get_databases(self):
         cmd = SQLLoader.show_databases
@@ -200,6 +208,16 @@ class MainWindow(QtGui.QMainWindow):
             return self.current_tab_widget()
 
     def execute_sql(self, sql, notify=True, sql_params=[], limit=None):
+        if self.db is None:
+            if notify:
+                print('No database loaded')
+            return [], []
+
+        if self.db.connection is None:
+            if notify:
+                print('No connection to database established')
+            return [], []
+
         try:
             if self.default_database:
                 self.db.connection.cursor().execute(SQLLoader.use.format(db=self.default_database))
@@ -207,6 +225,9 @@ class MainWindow(QtGui.QMainWindow):
             cursor.execute(sql, *sql_params)
                 
         except QueryError as e:
+            if notify:
+                print('Error:' + str(e))
+        except OperationalError as e:
             if notify:
                 print('Error:' + str(e))
         except Exception:
@@ -242,9 +263,13 @@ class ConnectThread(QtCore.QThread):
         super().__init__(parent)
         self.db = None
         self.connection_config = connection_config
+        self.error = None
 
     def run(self):
         print('start')
         self.db = TunnelledMySQL(**self.connection_config)
-        self.db.__enter__()
+        try:
+            self.db.__enter__()
+        except Exception as e:
+            self.error = e
         print('done')
