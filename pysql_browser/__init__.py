@@ -6,10 +6,12 @@ from PySide import QtCore, QtGui
 from .mysql_connection import TunnelledMySQL, QueryError
 from .tables_widgets import TablesWidget
 from .tab_widgets import Tabs, Tab
-from .db_config import config
 from . import app_config
 from .mysql_utils import escape
 from .sql_loader import SQLLoader
+from .dialogs.connections_dialog import ConnectionsDialog
+from .connections import Connection
+from .settings_saver import load
 
 
 TEST = False
@@ -33,6 +35,8 @@ class MainWindow(QtGui.QMainWindow):
 
         self.default_database = None
         self.progress_bar = None
+        self.connections = []
+        self.connections_menu = None
         self.create_menus()
 
         self.main_splitter = QtGui.QSplitter()
@@ -59,24 +63,43 @@ class MainWindow(QtGui.QMainWindow):
         action = QtGui.QAction('New &Tab', self)
         action.triggered.connect(self.new_tab)
         file_menu.addAction(action)
+        self.connections_menu = self.menuBar().addMenu('&Connections')
+        self.populate_connections_menu()
 
-        servers_menu = self.menuBar().addMenu('&Servers')
-        for server_key, (name, connection) in sorted(dict(config).items()):
-            action = QtGui.QAction(name, self)
-            action.triggered.connect(partial(self.set_db_server, server_key))
-            servers_menu.addAction(action)
+    def populate_connections_menu(self):
+        self.connections_menu.clear()
+        self.connections = load('connections', [])
+        if self.connections:
+            for connection in self.connections:
+                action = QtGui.QAction(connection.name, self)
+                action.triggered.connect(partial(self.set_db_server, connection))
+                self.connections_menu.addAction(action)
+        else:
+            action = QtGui.QAction('No Connections Configured', self)
+            action.setEnabled(False)
+            self.connections_menu.addAction(action)
 
-    def set_db_server(self, db_key):
-        self._set_db_server_first(db_key)
+        self.connections_menu.addSeparator()
+        edit_connections_action = QtGui.QAction('Edit Connections', self)
+        edit_connections_action.triggered.connect(self.connections_dialog)
+        self.connections_menu.addAction(edit_connections_action)
 
-        name, connection_config = config[db_key]
-        self.statusBar().showMessage('Loading ' + name)
+    def connections_dialog(self):
+        servers_dialog = ConnectionsDialog()
+        servers_dialog.show()
+        servers_dialog.exec_()
+        self.populate_connections_menu()
+
+    def set_db_server(self, connection):
+        self._set_db_server_first(connection)
+
+        self.statusBar().showMessage('Loading ' + connection.name)
         self.repaint()
-        self.thread = ConnectThread(self, name, **connection_config)
+        self.thread = ConnectThread(self, **connection.__dict__)
         self.thread.finished.connect(self._set_db_server_second)
         self.thread.start()
 
-    def _set_db_server_first(self, db_key):
+    def _set_db_server_first(self, connection):
         if self.db and self.db.enter_ok:
             self.db.close()
 
