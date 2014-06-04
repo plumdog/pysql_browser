@@ -112,6 +112,8 @@ class MainWindow(QtGui.QMainWindow):
                 message = 'SSH Tunnel connection failed.'
             elif isinstance(self.thread.error, OperationalError):
                 code, message = self.thread.error.args
+            else:
+                message = str(self.thread.error)
 
             self.statusBar().showMessage('Error: ' + message)
         else:
