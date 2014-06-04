@@ -125,7 +125,7 @@ class ResultsWidgetTable(QtGui.QTableWidget):
         pos = event.globalPos()
         item = self.currentItem()
         menu = QtGui.QMenu()
-        field = self.col_number_to_field.get(item.column())
+        field = self.col_number_to_field.get(item.column()).name
         fk = self.fks.get(field)
         if fk:
             action = QtGui.QAction(self.fk_out(item, fk, get_sql_only=True), self)
